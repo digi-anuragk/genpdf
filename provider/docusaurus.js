@@ -10,7 +10,11 @@ export async function generateDocusaurusPDF(
   console.debug(`Docusaurus version: ${version}`);
   console.debug(`Docs directory: ${docsDir}`);
   core.contentSelector = 'article';
-
+  core.puppeteerArgs = [
+    '--disable-gpu',
+    '--no-sandbox',
+    '--disable-setuid-sandbox',];
+  core.protocolTimeout = 1000 * 60 * 60;
   // Pagination and exclude selectors are different depending on Docusaurus version
   if (version == 2) {
     console.debug('Docusaurus version 2');

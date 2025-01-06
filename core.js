@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import puppeteer from 'puppeteer-core';
-import { scrollPageToBottom } from 'puppeteer-autoscroll-down';
+const { scrollPageToBottom } = await import('puppeteer-autoscroll-down');
 import fs from 'fs-extra';
 import { chromeExecPath } from './browser.js';
 import * as utils from './utils.js';
@@ -37,7 +37,7 @@ export async function generatePDF({
   const execPath = process.env.PUPPETEER_EXECUTABLE_PATH ?? chromeExecPath();
   console.debug(chalk.cyan(`Using Chromium from ${execPath}`));
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     executablePath: execPath,
     args: puppeteerArgs,
     protocolTimeout: protocolTimeout,
@@ -61,6 +61,7 @@ export async function generatePDF({
   });
 
   console.debug(`InitialDocURLs: ${initialDocURLs}`);
+  const set = new Set()
   for (const url of initialDocURLs) {
     let nextPageURL = url;
     const urlPath = new URL(url).pathname;
@@ -69,6 +70,13 @@ export async function generatePDF({
     while (nextPageURL) {
       console.log(chalk.cyan(`Retrieving html from ${nextPageURL}`));
 
+      if (set.has(nextPageURL)) {
+        nextPageURL = await utils.findNextUrl(page, paginationSelector);
+        console.log(chalk.yellowBright("cyclic doc detected !!"))
+        break;
+      }
+
+      set.add(nextPageURL)
       // Go to the page specified by nextPageURL
       await page.goto(`${nextPageURL}`, {
         waitUntil: 'networkidle0',
@@ -97,9 +105,9 @@ export async function generatePDF({
         }
         // Get the HTML string of the content section.
 
-        console.log(chalk.red())
+        // console.log(chalk.red())
         contentHTML += await utils.getHtmlContent(page, contentSelector);
-        console.log(chalk.green('Success'));
+        console.log(chalk.green('Success\n'));
       }
 
       // Find next page url before DOM operations
@@ -163,10 +171,14 @@ export async function generatePDF({
   // Scroll to the bottom of the page with puppeteer-autoscroll-down
   // This forces lazy-loading images to load
   console.log(chalk.cyan('Scroll to the bottom of the page...'));
-  await scrollPageToBottom(page, {}); //cast to puppeteer-core type
+  await scrollPageToBottom(page, {
+    size: 100,
+    delay: 150
+  }); //cast to puppeteer-core type
 
   // Generate PDF
   console.log(chalk.cyan('Generate PDF...'));
+  // await page.emulateMediaType("print")
   await page.pdf({
     path: outputPDFFilename,
     format: paperFormat,
@@ -175,7 +187,7 @@ export async function generatePDF({
     displayHeaderFooter: !!(headerTemplate || footerTemplate),
     headerTemplate,
     footerTemplate,
-    timeout: 0,
+    timeout: 2147483647,
   });
 
   console.log(chalk.green(`PDF generated at ${outputPDFFilename}`));
