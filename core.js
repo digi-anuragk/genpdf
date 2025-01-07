@@ -10,6 +10,7 @@ let contentHTML = '';
 
 /* c8 ignore start */
 export async function generatePDF({
+  maxHeadingLevel,
   initialDocURLs,
   excludeURLs,
   outputPDFFilename = 'docs-to-pdf.pdf',
@@ -136,7 +137,7 @@ export async function generatePDF({
 
   // console.log(chalk.green(contentHTML))
   // Generate Toc
-  const { modifiedContentHTML, tocHTML } = utils.generateToc(contentHTML);
+  const { modifiedContentHTML, tocHTML } = utils.generateToc(contentHTML, +maxHeadingLevel);
 
   // console.log(chalk.yellow(modifiedContentHTML))
   // Restructuring the HTML of a document

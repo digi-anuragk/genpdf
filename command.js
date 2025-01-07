@@ -72,6 +72,10 @@ export function makeProgram() {
   docstopdf.commands.forEach((cmd) => {
     cmd
       .option(
+        '--maxHeadingLevel <maxHeadingLevel>',
+        'set TOC max heading level to take [1 to 4]'
+      )
+      .option(
         '--initialDocURLs <urls>',
         'set urls to start generating PDF from',
         commaSeparatedList,
