@@ -1,19 +1,18 @@
-import chalk from 'chalk';
-import puppeteer from 'puppeteer-core';
-const { scrollPageToBottom } = await import('puppeteer-autoscroll-down');
-import fs from 'fs-extra';
-import { chromeExecPath } from './browser.js';
-import * as utils from './utils.js';
+import chalk from "chalk";
+import puppeteer from "puppeteer-core";
+const { scrollPageToBottom } = await import("puppeteer-autoscroll-down");
+import fs from "fs-extra";
+import { chromeExecPath } from "./browser.js";
+import * as utils from "./utils.js";
 
-
-let contentHTML = '';
+let contentHTML = "";
 
 /* c8 ignore start */
 export async function generatePDF({
   maxHeadingLevel,
   initialDocURLs,
   excludeURLs,
-  outputPDFFilename = 'docs-to-pdf.pdf',
+  outputPDFFilename = "docs-to-pdf.pdf",
   pdfMargin = { top: 32, right: 32, bottom: 32, left: 32 },
   contentSelector,
   paginationSelector,
@@ -46,23 +45,23 @@ export async function generatePDF({
 
   const chromeTmpDataDir = browser
     .process()
-    ?.spawnargs.find((arg) => arg.startsWith('--user-data-dir'))
-    ?.split('=')[1]
+    ?.spawnargs.find((arg) => arg.startsWith("--user-data-dir"))
+    ?.split("=")[1];
   console.debug(chalk.cyan(`Chrome user data dir: ${chromeTmpDataDir}`));
 
   const page = await browser.newPage();
 
   // Block PDFs as puppeteer can not access them
   await page.setRequestInterception(true);
-  page.on('request', (request) => {
-    if (request.url().endsWith('.pdf')) {
+  page.on("request", (request) => {
+    if (request.url().endsWith(".pdf")) {
       console.log(chalk.yellowBright(`ignore pdf: ${request.url()}`));
       request.abort();
     } else request.continue();
   });
 
   console.debug(`InitialDocURLs: ${initialDocURLs}`);
-  const set = new Set()
+  const set = new Set();
   for (const url of initialDocURLs) {
     let nextPageURL = url;
     const urlPath = new URL(url).pathname;
@@ -73,19 +72,19 @@ export async function generatePDF({
 
       if (set.has(nextPageURL)) {
         nextPageURL = await utils.findNextUrl(page, paginationSelector);
-        console.log(chalk.yellowBright("cyclic doc detected !!"))
+        console.log(chalk.yellowBright("cyclic doc detected !!"));
         break;
       }
 
-      set.add(nextPageURL)
+      set.add(nextPageURL);
       // Go to the page specified by nextPageURL
       await page.goto(`${nextPageURL}`, {
-        waitUntil: 'networkidle0',
+        waitUntil: "networkidle0",
         timeout: 0,
       });
 
       if (waitForRender) {
-        console.log(chalk.green('Waiting for render...'));
+        console.log(chalk.green("Waiting for render..."));
         await new Promise((r) => setTimeout(r, waitForRender));
       }
 
@@ -107,8 +106,10 @@ export async function generatePDF({
         // Get the HTML string of the content section.
 
         // console.log(chalk.red())
-        contentHTML += await utils.getHtmlContent(page, contentSelector);
-        console.log(chalk.green('Success\n'));
+        let changedContent = await utils.getHtmlContent(page, contentSelector);
+        changedContent = utils.replaceHeaderTags(changedContent, nextPageURL);
+        contentHTML += changedContent;
+        console.log(chalk.green("Success\n"));
       }
 
       // Find next page url before DOM operations
@@ -116,37 +117,38 @@ export async function generatePDF({
     }
   }
 
-  console.log(chalk.cyan('Start generating PDF...'));
+  console.log(chalk.cyan("Start generating PDF..."));
 
   // Generate cover Image if declared
-  let coverImageHtml = '';
+  let coverImageHtml = "";
   if (coverImage) {
-    console.log(chalk.cyan('Get coverImage...'));
+    console.log(chalk.cyan("Get coverImage..."));
     const image = await utils.getCoverImage(page, coverImage);
     coverImageHtml = utils.generateImageHtml(image.base64, image.type);
   }
 
   // Generate Cover
-  console.log(chalk.cyan('Generate cover...'));
+  console.log(chalk.cyan("Generate cover..."));
   const coverHTML = utils.generateCoverHtml(
     coverTitle,
     coverImageHtml,
     coverSub,
   );
 
-
   // console.log(chalk.green(contentHTML))
   // Generate Toc
-  const { modifiedContentHTML, tocHTML } = utils.generateToc(contentHTML, +maxHeadingLevel);
+  const { modifiedContentHTML, tocHTML } = utils.generateToc(
+    contentHTML,
+    +maxHeadingLevel,
+  );
 
   // console.log(chalk.yellow(modifiedContentHTML))
   // Restructuring the HTML of a document
-  console.log(chalk.cyan('Restructuring the html of a document...'));
-
+  console.log(chalk.cyan("Restructuring the html of a document..."));
 
   // console.log(chalk.green(tocHTML))
   // Go to initial page
-  await page.goto(`${initialDocURLs[0]}`, { waitUntil: 'networkidle0' });
+  await page.goto(`${initialDocURLs[0]}`, { waitUntil: "networkidle0" });
 
   await page.evaluate(
     utils.concatHtml,
@@ -159,26 +161,26 @@ export async function generatePDF({
 
   // Remove unnecessary HTML by using excludeSelectors
   if (excludeSelectors) {
-    console.log(chalk.cyan('Remove unnecessary HTML...'));
+    console.log(chalk.cyan("Remove unnecessary HTML..."));
     await utils.removeExcludeSelector(page, excludeSelectors);
   }
 
   // Add CSS to HTML
   if (cssStyle) {
-    console.log(chalk.cyan('Add CSS to HTML...'));
+    console.log(chalk.cyan("Add CSS to HTML..."));
     await page.addStyleTag({ content: cssStyle });
   }
 
   // Scroll to the bottom of the page with puppeteer-autoscroll-down
   // This forces lazy-loading images to load
-  console.log(chalk.cyan('Scroll to the bottom of the page...'));
+  console.log(chalk.cyan("Scroll to the bottom of the page..."));
   await scrollPageToBottom(page, {
     size: 100,
-    delay: 150
+    delay: 200,
   }); //cast to puppeteer-core type
 
   // Generate PDF
-  console.log(chalk.cyan('Generate PDF...'));
+  console.log(chalk.cyan("Generate PDF..."));
   // await page.emulateMediaType("print")
   await page.pdf({
     path: outputPDFFilename,
@@ -193,11 +195,11 @@ export async function generatePDF({
 
   console.log(chalk.green(`PDF generated at ${outputPDFFilename}`));
   await browser.close();
-  console.log(chalk.green('Browser closed'));
+  console.log(chalk.green("Browser closed"));
 
   if (chromeTmpDataDir !== null) {
     fs.removeSync(chromeTmpDataDir);
   }
-  console.debug(chalk.cyan('Chrome user data dir removed'));
+  console.debug(chalk.cyan("Chrome user data dir removed"));
 }
 /* c8 ignore stop */

@@ -1,5 +1,4 @@
-
-import chalk from 'chalk';
+import chalk from "chalk";
 
 /**
  * Checks whether a page contains a given keyword
@@ -13,20 +12,20 @@ export async function matchKeyword(page, keyword) {
       "head > meta[name='keywords']",
       (element) => element.content,
     );
-    if (metaKeywords.split(',').includes(keyword)) {
+    if (metaKeywords.split(",").includes(keyword)) {
       console.log(
-        chalk.green('Keyword found: ' + keyword + ' in ' + metaKeywords),
+        chalk.green("Keyword found: " + keyword + " in " + metaKeywords),
       );
       return true;
     }
     console.log(
       chalk.yellowBright(
-        'Keyword not found: ' + keyword + ' in ' + metaKeywords,
+        "Keyword not found: " + keyword + " in " + metaKeywords,
       ),
     );
     return false;
   } catch (e) {
-    console.error(chalk.red('No meta keywords found: ' + e));
+    console.error(chalk.red("No meta keywords found: " + e));
     return false;
   }
 }
@@ -53,14 +52,13 @@ export function getHtmlFromSelector(selector) {
   const element = document.querySelector(selector);
   if (element) {
     // Add pageBreak for PDF
-    element.style.pageBreakAfter = 'always';
+    element.style.pageBreakAfter = "always";
 
     return element.outerHTML;
   } else {
-    return '';
+    return "";
   }
 }
-
 
 /**
  * Recursively opens all <details> elements on a page.
@@ -69,17 +67,13 @@ export function getHtmlFromSelector(selector) {
  * @param clickFunction - A function to click the summary element of a <details> element.
  * @param waitFunction - A function to wait for a specified number of milliseconds.
  */
-export async function openDetails(
-  page,
-  clickFunction,
-  waitFunction,
-) {
-  const detailsHandles = await page.$$('details');
+export async function openDetails(page, clickFunction, waitFunction) {
+  const detailsHandles = await page.$$("details");
 
   // console.debug(`Found ${detailsHandles.length} elements`);
 
   for (const detailsHandle of detailsHandles) {
-    const summaryHandle = await detailsHandle.$('summary');
+    const summaryHandle = await detailsHandle.$("summary");
     if (summaryHandle) {
       console.debug(
         `Clicking summary: ${await summaryHandle.evaluate(
@@ -116,10 +110,10 @@ export function getUrlFromSelector(selector) {
   const element = document.querySelector(selector);
   if (element) {
     // If the element is found, return its href property as the next page URL
-    return (element).href;
+    return element.href;
   } else {
     // If the element is not found, return an empty string
-    return '';
+    return "";
   }
 }
 
@@ -131,16 +125,10 @@ export function getUrlFromSelector(selector) {
  * @param disable - A boolean indicating whether to disable the table of contents.
  * @returns The concatenated HTML content.
  */
-export function concatHtml(
-  cover,
-  toc,
-  content,
-  disable,
-  baseUrl,
-) {
+export function concatHtml(cover, toc, content, disable, baseUrl) {
   // Clear the body content
   const body = document.body;
-  body.innerHTML = '';
+  body.innerHTML = "";
 
   // Add base tag for relative links
   // see: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
@@ -173,9 +161,9 @@ export async function getCoverImage(page, url) {
   // Download buffer of coverImage if it exists
   const imgSrc = await page.goto(url);
   const imgSrcBuffer = await imgSrc?.buffer();
-  const base64 = imgSrcBuffer?.toString('base64') || '';
-  const type = imgSrc?.headers()['content-type'] || '';
-  console.log(chalk.cyan('Cover image content-type: ' + type));
+  const base64 = imgSrcBuffer?.toString("base64") || "";
+  const type = imgSrc?.headers()["content-type"] || "";
+  console.log(chalk.cyan("Cover image content-type: " + type));
   return { base64, type };
 }
 
@@ -189,7 +177,7 @@ export async function getCoverImage(page, url) {
  */
 export function generateImageHtml(
   imgBase64,
-  contentType = 'image/png',
+  contentType = "image/png",
   width = 140,
   height = 140,
 ) {
@@ -210,11 +198,7 @@ export function generateImageHtml(
  * @param coverSub - The subtitle for the cover page.
  * @returns The HTML code for the cover page.
  */
-export function generateCoverHtml(
-  coverTitle,
-  coverImageHtml,
-  coverSub,
-) {
+export function generateCoverHtml(coverTitle, coverImageHtml, coverSub) {
   // Return the HTML code for the cover page with optional title, subtitle, and cover image
   return `
   <div
@@ -229,11 +213,52 @@ export function generateCoverHtml(
       text-align: center;
     "
   >
-    ${coverTitle ? `<h1>${coverTitle}</h1>` : ''}
-    ${coverSub ? `<h3>${coverSub}</h3>` : ''}
+    ${coverTitle ? `<h1>${coverTitle}</h1>` : ""}
+    ${coverSub ? `<h3>${coverSub}</h3>` : ""}
     ${coverImageHtml}
   </div>`;
 }
+
+export function replaceHeaderTags(contentHtml, purl) {
+  const url = new URL(purl);
+  const Idre = new RegExp("<h[1-6](.+?)</h[1-6]( )*>", "g");
+  const Hrefre = new RegExp(
+    '<a\s*(?!.*\bclass\b\s*=\s*"[^"]*").*?>.*?</a>',
+    "g",
+  );
+
+  let modifiedContentHTML = contentHtml.replace(Idre, (ms) => {
+    let idre = new RegExp('id="([^"]*?)"', "g");
+    let obj = idre.exec(ms);
+    let rid = `${url}${obj ? `#${obj[1]}` : ``}`;
+    rid = rid.replaceAll(url.origin, "");
+    let rh = replaceHeader(ms, rid, 6);
+    // console.log(chalk.yellow(obj ? obj[1] : ""));
+    // console.log(chalk.yellow(rh));
+    // console.log(rh);
+    // console.log("\n");
+    return rh;
+  });
+
+  modifiedContentHTML = modifiedContentHTML.replace(Hrefre, (ms) => {
+    let hrefre = new RegExp('href="(\/[^"]*?)"', "g");
+    // let obj = hrefre.exec(ms);
+
+    ms = ms.replace(hrefre, (s, cid) => {
+      let ra = `href="#${url.origin}${cid}"`;
+      ra = ra.replaceAll(url.origin, "");
+      // console.log(s);
+      // console.log(ra);
+      // console.log("\n");
+      return ra;
+    });
+
+    return ms;
+  });
+  return modifiedContentHTML;
+}
+
+export function getHeaderData(headerHtml) {}
 
 /**
  * Generates a table of contents (TOC) HTML and modifies the content HTML by replacing header tags with updated header IDs.
@@ -244,14 +269,17 @@ export function generateCoverHtml(
 export function generateToc(contentHtml, maxLevel = 4) {
   const headers = [];
 
-  console.log(chalk.cyan('Start generating TOC...'));
+  console.log(chalk.cyan("Start generating TOC..."));
   // Create TOC only for h1~h${maxLevel}
   // Regex to match all header tags
   const re = new RegExp(
-    '<h[1-' + maxLevel + '](.+?)</h[1-' + maxLevel + ']( )*>',
-    'g',
+    "<h[1-" + maxLevel + "](.+?)</h[1-" + maxLevel + "]( )*>",
+    "g",
   );
+  //
+  // // console.log(chalk.yellow(contentHtml));
   const modifiedContentHTML = contentHtml.replace(re, htmlReplacer);
+  // console.log(chalk.green(modifiedContentHTML));
 
   function htmlReplacer(matchedStr) {
     // Generate header information and update the headers array
@@ -259,10 +287,12 @@ export function generateToc(contentHtml, maxLevel = 4) {
     headers.push({ header: headerText, level, id: headerId });
 
     // Replace the header ID in the matched string and return the modified string
-    return replaceHeader(matchedStr, headerId, maxLevel);
+    return matchedStr;
   }
 
+  // console.log(chalk.blue(JSON.stringify(headers)));
   const tocHTML = generateTocHtml(headers);
+  // console.log(chalk.red(tocHTML));
 
   return { modifiedContentHTML, tocHTML };
 }
@@ -277,10 +307,11 @@ export function generateTocHtml(headers) {
   const toc = headers
     .map(
       (header) =>
-        `<li class="toc-item toc-item-${header.level}" style="margin-left:${(header.level - 1) * 20
+        `<li class="toc-item toc-item-${header.level}" style="margin-left:${
+          (header.level - 1) * 20
         }px"><a href="#${header.id}">${header.header}</a></li>`,
     )
-    .join('\n');
+    .join("\n");
   // Return the HTML code for the table of contents
   return `
   <div class="toc-page" style="page-break-after: always;">
@@ -299,16 +330,22 @@ export function generateTocHtml(headers) {
 export function generateHeader(headers, matchedStr) {
   // Remove anchor tags inserted by Docusaurus for direct links to the header
   const headerText = matchedStr
-    .replace(/<a[^>]*>#<\/a( )*>/g, '')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<a[^>]*>#<\/a( )*>/g, "")
+    .replace(/<[^>]*>/g, "")
     .trim();
 
   // Generate a random header ID using a combination of random characters and the headers array length
-  const headerId = `${Math.random().toString(36).slice(2, 5)}-${headers.length
-    }`;
+  // const headerId = `${Math.random().toString(36).slice(2, 5)}-${
+  //   headers.length
+  // }`;
+  //
+  let idre = new RegExp('id="([^"]*?)"', "g");
+  let obj = idre.exec(matchedStr);
+
+  const headerId = obj[1];
 
   // Extract the level from the matched string (e.g., h1, h2, etc.)
-  const level = Number(matchedStr[matchedStr.indexOf('h') + 1]);
+  const level = Number(matchedStr[matchedStr.indexOf("h") + 1]);
 
   return { headerText, headerId, level };
 }
@@ -319,13 +356,9 @@ export function generateHeader(headers, matchedStr) {
  * @param headerId - The ID value to replace the existing IDs with.
  * @returns The modified string with replaced header IDs.
  */
-export function replaceHeader(
-  matchedStr,
-  headerId,
-  maxLevel = 3,
-) {
+export function replaceHeader(matchedStr, headerId, maxLevel = 3) {
   // Create a regular expression to match the header tags
-  const re = new RegExp('<h[1-' + maxLevel + '].*?>', 'g');
+  const re = new RegExp("<h[1-" + maxLevel + "].*?>", "g");
   // Replaces the ID attribute of the headers using regular expressions and the headerId parameter
   const modifiedContentHTML = matchedStr.replace(re, (header) => {
     if (header.match(/id( )*=( )*"/g)) {
@@ -345,10 +378,7 @@ export function replaceHeader(
  * @param page - The Puppeteer page object.
  * @param excludeSelectors - An array of CSS selectors for elements to be removed.
  */
-export async function removeExcludeSelector(
-  page,
-  excludeSelectors,
-) {
+export async function removeExcludeSelector(page, excludeSelectors) {
   excludeSelectors.map(async (excludeSelector) => {
     await page.evaluate(removeElementFromSelector, excludeSelector);
   });
@@ -389,7 +419,7 @@ export async function isPageKept(
   restrictPaths,
 ) {
   if (excludeURLs && excludeURLs.includes(nextPageURL)) {
-    console.log(chalk.green('This URL is excluded.'));
+    console.log(chalk.green("This URL is excluded."));
     return false;
   } else if (filterKeyword && !(await matchKeyword(page, filterKeyword))) {
     console.log(
